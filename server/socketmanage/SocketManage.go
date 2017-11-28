@@ -135,16 +135,18 @@ func (this *SocketServerManage) init(addr string, port int) (bool, error) {
 		return false, fmt.Errorf("error: setNonblock: %v", err)
 	}
 
-	var sa sockaddr4
-	sa.sa.Addr, err = inet_addr(addr)
+	var sa syscall.SockaddrInet4
+	sa.Addr, err = inet_addr(addr)
 	if err != nil {
 		return false, fmt.Errorf("error: %v", err)
 	}
-	sa.sa.Port = int(htons(uint16(port)))
-	err = syscall.Bind(this.listensocket, sa)
+	sa.Port = int(htons(uint16(port)))
+	err = syscall.Bind(this.listensocket, &sa)
 	if err != nil {
 		return false, fmt.Errorf("error: bind: %v", err)
 	}
+
+	fmt.Printf("listen: %s, port: %d", sa.Addr, sa.Port)
 
 	err = syscall.Listen(this.listensocket, syscall.SOMAXCONN)
 	if err != nil {
@@ -162,6 +164,7 @@ func (this *SocketServerManage) init(addr string, port int) (bool, error) {
 func (this *SocketServerManage) epollWork() {
 
 	var epollenvs []syscall.EpollEvent
+	epollenvs = make([]syscall.EpollEvent, epollEnvCount)
 
 	for {
 		select {
@@ -238,7 +241,7 @@ func (this *SocketServerManage) doRead(env syscall.EpollEvent) {
 }
 
 func (this *SocketServerManage) doSend(env syscall.EpollEvent) {
-	sock := this.clisockets[int(env.Fd)]
+	sock, _ := this.clisockets[int(env.Fd)]
 	sock.DoSend()
 }
 
@@ -291,9 +294,11 @@ func (this *SocketServerManage) Work() error {
 	}
 
 	this.start = true
-	this.ready <- '0'
+
 	go this.epollWork()
 	go this.withRecv()
+
+	this.ready <- '0'
 
 	return nil
 }
