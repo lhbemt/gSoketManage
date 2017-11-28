@@ -204,6 +204,7 @@ func (this *SocketServerManage) doAccept(env syscall.EpollEvent) {
 			client := socketclient.NewSocketClient(fd)
 			this.clients[fd] = true
 			this.clisockets[fd] = client
+			syscall.SetNonblock(fd, true)
 			this.clientsguard.Unlock()
 			this.epollAttach(fd) //attach
 			continue
