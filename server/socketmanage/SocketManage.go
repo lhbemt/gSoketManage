@@ -140,13 +140,13 @@ func (this *SocketServerManage) init(addr string, port int) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error: %v", err)
 	}
-	sa.Port = int(htons(uint16(port)))
+	sa.Port = port
 	err = syscall.Bind(this.listensocket, &sa)
 	if err != nil {
 		return false, fmt.Errorf("error: bind: %v", err)
 	}
 
-	fmt.Printf("listen: %s, port: %d", sa.Addr, sa.Port)
+	fmt.Printf("listen: %s, port: %d", addr, sa.Port)
 
 	err = syscall.Listen(this.listensocket, syscall.SOMAXCONN)
 	if err != nil {
@@ -169,6 +169,7 @@ func (this *SocketServerManage) epollWork() {
 	for {
 		select {
 		case <-this.ready :
+			//fmt.Println("start epollwait")
 			ready, err := syscall.EpollWait(this.epollfd, epollenvs, -1)
 			if err != nil && err != syscall.EAGAIN {
 				fmt.Printf("epoll_wait error: %v\n", err)
@@ -184,7 +185,9 @@ func (this *SocketServerManage) epollWork() {
 					}
 				}
 			}
+			//fmt.Println("before send ready")
 			this.ready <- '0'
+			//fmt.Println("after send ready")
 		case <-this.stop :
 			return //ternimate routine
 		}
@@ -195,9 +198,10 @@ func (this *SocketServerManage) doAccept(env syscall.EpollEvent) {
 	for {
 		fd, _, err := syscall.Accept(int(env.Fd))
 		if err != nil && err != syscall.EAGAIN {
-			fmt.Printf("accept error: %v", err)
+			//fmt.Printf("accept error: %v", err)
 			return
 		} else if err != nil && err == syscall.EAGAIN {
+			//fmt.Println("accept return")
 			return
 		} else { // new client
 			this.clientsguard.Lock()
@@ -207,6 +211,7 @@ func (this *SocketServerManage) doAccept(env syscall.EpollEvent) {
 			syscall.SetNonblock(fd, true)
 			this.clientsguard.Unlock()
 			this.epollAttach(fd) //attach
+			//fmt.Printf("accept success, fd: %d\n", fd)
 			continue
 		}
 	}
@@ -231,8 +236,9 @@ func (this *SocketServerManage) doRead(env syscall.EpollEvent) {
 		} else if err != nil && (err == syscall.EAGAIN || err == syscall.EWOULDBLOCK) {
 			return
 		} else {
+			fmt.Printf("read from fd: %d, buf: %s", env.Fd, buf)
 			var recv socketRecvPackage
-			recv.buf = buf[0:]
+			recv.buf = buf[0:nlen]
 			recv.len = nlen
 			recv.fd = int(env.Fd)
 			this.recvBytes <- recv
@@ -277,7 +283,7 @@ func New() *SocketServerManage {
 		clients: make(map[int]bool),
 		clisockets: make(map[int]*socketclient.SocketClient),
 		recvBytes: make(chan socketRecvPackage),
-		ready: make(chan byte),
+		ready: make(chan byte, 2),
 		stop: make (chan byte),
 	}
 

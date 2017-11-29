@@ -20,7 +20,7 @@ func handlewrite(f net.Conn) {
 }
 
 func main() {
-	conn,err := net.Dial("tcp", "127.0.0.1:36895")
+	conn,err := net.Dial("tcp", "127.0.0.1:8080")
 	if err != nil {
 		fmt.Printf("conn error: %v\n", err)
 		return

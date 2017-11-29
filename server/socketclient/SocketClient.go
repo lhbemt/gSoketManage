@@ -34,7 +34,8 @@ func (this *SocketClient) Recv(buf []byte, len int) { // recv to buff
 			this.recvLen += 1
 		}
 	}
-	fmt.Println(this.RecvBuff) // do someting with recvbuf
+	fmt.Printf("recvlen: %d\n", this.recvLen)
+	fmt.Println(string(this.RecvBuff)) // do someting with recvbuf
 }
 
 func (this *SocketClient) Send(buf []byte, len int) (int) {
@@ -61,6 +62,9 @@ func (this *SocketClient) Send(buf []byte, len int) (int) {
 func (this *SocketClient) DoSend() { // when network not busy again, use this func
 	this.sendguard.Lock()
 	defer this.sendguard.Unlock()
+	if this.sendLen == 0 { // epollout
+		return
+	}
 	nSend, err := syscall.Write(this.Fd, this.SendBuff)
 	if err != nil && (err == syscall.EAGAIN || err == syscall.EWOULDBLOCK) {
 		return
